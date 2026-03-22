@@ -1,0 +1,5 @@
+*.pkl
+*.csv
+recordings/*
+data/
+__pycache__
