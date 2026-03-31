@@ -75,7 +75,7 @@ def predict_folder(folder_path):
 # =========================
 if __name__ == "__main__":
     
-    folder = "input"  # put your test audio files here
+    folder = r"C:\Users\Aadhav Nagarajan\OneDrive\Desktop\College Stuff\MLAccent\input"  # put your test audio files here
 
     results = predict_folder(folder)
 

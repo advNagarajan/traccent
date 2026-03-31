@@ -3,6 +3,7 @@ import numpy as np
 
 def extract_features(audio, sr):
 
+    # MFCC
     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=40)
     delta = librosa.feature.delta(mfcc)
 
@@ -16,13 +17,19 @@ def extract_features(audio, sr):
     delta_mean = np.mean(delta, axis=1)
     delta_std = np.std(delta, axis=1)
 
+    # NEW FEATURES (small but useful)
+    zcr = np.mean(librosa.feature.zero_crossing_rate(audio))
+    centroid = np.mean(librosa.feature.spectral_centroid(y=audio, sr=sr))
+
     features = np.hstack([
         mfcc_mean,
         mfcc_std,
         mfcc_min,
         mfcc_max,
         delta_mean,
-        delta_std
+        delta_std,
+        zcr,
+        centroid
     ])
 
     return features
