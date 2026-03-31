@@ -1,35 +1,45 @@
 import librosa
 import numpy as np
+from scipy.stats import skew, kurtosis
 
 def extract_features(audio, sr):
 
-    # MFCC
+    # MFCCs
     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=40)
     delta = librosa.feature.delta(mfcc)
-
-    # MFCC stats
-    mfcc_mean = np.mean(mfcc, axis=1)
-    mfcc_std = np.std(mfcc, axis=1)
-    mfcc_min = np.min(mfcc, axis=1)
-    mfcc_max = np.max(mfcc, axis=1)
-
-    # Delta stats
-    delta_mean = np.mean(delta, axis=1)
-    delta_std = np.std(delta, axis=1)
-
-    # NEW FEATURES (small but useful)
-    zcr = np.mean(librosa.feature.zero_crossing_rate(audio))
-    centroid = np.mean(librosa.feature.spectral_centroid(y=audio, sr=sr))
-
-    features = np.hstack([
-        mfcc_mean,
-        mfcc_std,
-        mfcc_min,
-        mfcc_max,
-        delta_mean,
-        delta_std,
-        zcr,
-        centroid
+    
+    # Chroma
+    chroma = librosa.feature.chroma_stft(y=audio, sr=sr)
+    
+    # Spectral Contrast
+    contrast = librosa.feature.spectral_contrast(y=audio, sr=sr)
+    
+    # Spectral features
+    centroid = librosa.feature.spectral_centroid(y=audio, sr=sr)
+    rolloff = librosa.feature.spectral_rolloff(y=audio, sr=sr)
+    zcr = librosa.feature.zero_crossing_rate(audio)
+    
+    features = []
+    
+    # helper for stats
+    def get_stats(mat):
+        return [
+            np.mean(mat, axis=1),
+            np.std(mat, axis=1),
+            np.min(mat, axis=1),
+            np.max(mat, axis=1),
+            np.median(mat, axis=1)
+        ]
+        
+    for mat in [mfcc, delta, chroma, contrast]:
+        for stat in get_stats(mat):
+            features.extend(stat)
+            
+    # 1D features
+    features.extend([
+        np.mean(centroid), np.std(centroid),
+        np.mean(rolloff), np.std(rolloff),
+        np.mean(zcr), np.std(zcr)
     ])
-
-    return features
+    
+    return np.array(features)

@@ -12,24 +12,50 @@ model = joblib.load("model.pkl")
 scaler = joblib.load("scaler.pkl")
 
 
+import librosa
+
 # =========================
-# SINGLE FILE PREDICTION
+# SINGLE FILE PREDICTION (DENSE SLIDING WINDOW)
 # =========================
 def predict_file(file_path):
-    slices = load_audio_slices(file_path)
-
+    # Load the raw audio
+    audio, sr = librosa.load(file_path, sr=22050)
+    
+    # Normalize volume and strip total digital silence
+    if np.max(np.abs(audio)) > 0:
+        audio = audio / np.max(np.abs(audio))
+    audio, _ = librosa.effects.trim(audio, top_db=30)
+    
+    window_length = sr * 5  # 5 seconds
+    step_size = sr * 1      # 1 second stride
+    
     all_probs = []
-
-    for s in slices:
-        features = extract_features(s, 22050).reshape(1, -1)
-
-        # IMPORTANT: scale features
+    
+    # If file is too short, just pad and process once
+    if len(audio) < window_length:
+        padded = np.pad(audio, (0, window_length - len(audio)))
+        features = extract_features(padded, sr).reshape(1, -1)
         features = scaler.transform(features)
+        all_probs.append(model.predict_proba(features)[0])
+    else:
+        # Sliding dense window
+        for start in range(0, len(audio) - window_length + 1, step_size):
+            window = audio[start:start + window_length]
+            features = extract_features(window, sr).reshape(1, -1)
+            features = scaler.transform(features)
+            
+            probs = model.predict_proba(features)[0]
+            
+            # Confidence gating: Only keep this window if the model is decently confident (>40%) 
+            # This throws out pure static or heavy breathing windows
+            if np.max(probs) > 0.40:
+                all_probs.append(probs)
+                
+    # If the file was so bad everything was dropped, fall back
+    if len(all_probs) == 0:
+        return "Unknown", 0.0, {}
 
-        probs = model.predict_proba(features)[0]
-        all_probs.append(probs)
-
-    # average probabilities across slices
+    # Average the high-confidence windows
     avg_probs = np.mean(all_probs, axis=0)
 
     pred = model.classes_[np.argmax(avg_probs)]
@@ -75,12 +101,13 @@ def predict_folder(folder_path):
 # =========================
 if __name__ == "__main__":
     
-    folder = r"C:\Users\Aadhav Nagarajan\OneDrive\Desktop\College Stuff\MLAccent\input"  # put your test audio files here
+    folder = r"C:\Users\aadha\Desktop\College Stuff\mllab\traccent\input"  # put your test audio files here
 
     results = predict_folder(folder)
 
     for r in results:
-        print("\nFile:", r["file"])
-        print("Prediction:", r["prediction"])
-        print("Confidence:", r["confidence"])
-        print("Probabilities:", r["probabilities"])
+        print(f"\n=> File: {r['file']}")
+        print(f"Prediction: {r['prediction'].upper()}")
+        print("Probabilities:")
+        for accent, prob in r['probabilities'].items():
+            print(f"  - {accent.capitalize()}: {prob * 100:.1f}%")

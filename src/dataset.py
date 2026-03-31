@@ -22,7 +22,10 @@ def build_dataset(base_path):
 
                     X.append(features)
                     y.append(label)
-                    groups.append(file)  # same file group
+                    
+                    # Extract original speaker ID to prevent augmentation leakage
+                    original_id = file.split("aug_")[-1] if "aug_" in file else file
+                    groups.append(original_id)
 
             except:
                 continue

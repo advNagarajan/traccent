@@ -16,7 +16,7 @@ X, y, groups = build_dataset("data/controlled")
 print("Dataset shape:", X.shape)
 
 # =========================
-# GROUP-BASED SPLIT (CRITICAL)
+# STANDARD SPLIT (FOR METRICS)
 # =========================
 from sklearn.model_selection import train_test_split
 
@@ -39,44 +39,45 @@ X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
 # =========================
-# GRID SEARCH (SVM)
+# MODEL TRAINING (ENSEMBLE + FEATURE SELECTION)
 # =========================
-'''param_grid = {
-    'C': [5, 10, 20],
-    'gamma': ['scale', 0.01]
-}
-grid = GridSearchCV(
-    SVC(kernel='linear', probability=True, class_weight='balanced'),
-    param_grid,
-    cv=3,
-    verbose=1,
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
+from sklearn.svm import SVC
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.pipeline import Pipeline
+
+rf = RandomForestClassifier(n_estimators=100, max_depth=10, class_weight='balanced', random_state=42)
+gb = GradientBoostingClassifier(n_estimators=100, learning_rate=0.05, max_depth=3, random_state=42)
+svm = SVC(kernel='rbf', C=10, gamma='scale', probability=True, class_weight='balanced', random_state=42)
+
+voting = VotingClassifier(
+    estimators=[('rf', rf), ('gb', gb), ('svm', svm)],
+    voting='soft',
     n_jobs=-1
 )
 
-print("\nRunning GridSearch...")
-grid.fit(X_train, y_train)
+model = Pipeline([
+    ('feature_selection', SelectKBest(score_func=f_classif, k=150)),
+    ('classifier', voting)
+])
 
-model = grid.best_estimator_'''
-
-model = SVC(
-    kernel='rbf',
-    C=10,
-    gamma='scale',
-    probability=True,
-    class_weight='balanced'
-)
-
+print("\nRunning Ensemble Training with Feature Selection...")
 model.fit(X_train, y_train)
-
-#print("\nBest Parameters:", grid.best_params_)
 
 # =========================
 # EVALUATION
 # =========================
+from sklearn.metrics import roc_auc_score
+
 y_pred = model.predict(X_test)
+y_probs = model.predict_proba(X_test)
 
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
+
+# Calculate Multi-Class AUC
+auc_score = roc_auc_score(y_test, y_probs, multi_class='ovr')
+print(f"ROC AUC Score (OVR): {auc_score:.4f}\n")
 
 # =========================
 # SAVE MODEL + SCALER
