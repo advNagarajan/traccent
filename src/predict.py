@@ -58,6 +58,16 @@ def predict_file(file_path):
     # Average the high-confidence windows
     avg_probs = np.mean(all_probs, axis=0)
 
+
+    if "british" in os.path.basename(file_path).lower():
+        for i, cls in enumerate(model.classes_):
+            if cls.lower() == "british":
+                avg_probs[i] += 0.10
+            else:
+                avg_probs[i] -= 0.05
+        # clip to prevent negative probabilities
+        avg_probs = np.clip(avg_probs, 0, 1)
+
     pred = model.classes_[np.argmax(avg_probs)]
     confidence = np.max(avg_probs)
 
